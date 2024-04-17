@@ -25,10 +25,10 @@ QGPMaker_Encoder Encoder3(3);
 QGPMaker_Encoder Encoder4(4);
 
  
-volatile double pos1;
-volatile double pos2;
-volatile double pos3;
-volatile double pos4;
+volatile int pos1;
+volatile int pos2;
+volatile int pos3;
+volatile int pos4;
 volatile double rpm1;
 volatile double rpm2;
 volatile double rpm3;
@@ -212,12 +212,12 @@ void setup(){
   PPR = 12;
   gearratio = 30;
   CPR = (PPR*4) * gearratio;
-  
+  /*
   Servo1->writeServo(90);
   Servo2->writeServo(90);
   Servo3->writeServo(90);
   Servo4->writeServo(60);
- 
+  */
 }
 double before = millis();
 float theta_change_before = millis();
@@ -227,16 +227,21 @@ float vy;
 float w = 0;
 //float velocity[4];
 float theta = -PI/6;
-float theta_interval = PI/2;
+float theta_interval = PI/6;
 int add_sw = 0;
-float kp = 1;
-float ki = 0.1;
-float kd = 0.1;
+float kp = 5;
+float ki = 1.5;
+float kd = 1.0;
 
 float Target_RPM1 = 0;
 float Target_RPM2 = 0;
 float Target_RPM3 = 0;
 float Target_RPM4 = 0;
+
+float Target_RPM1_before = 0;
+float Target_RPM2_before = 0;
+float Target_RPM3_before = 0;
+float Target_RPM4_before = 0;
 
 float rpm_error1 = 0;
 float rpm_error2 = 0;
@@ -268,8 +273,10 @@ int now_pwm2 = 0;
 int now_pwm3 = 0;
 int now_pwm4 = 0;
 
+
 int Change_vector_interval = 1000; // ms
 float rpm_per_1m_s = 238.7;
+float rpm_per_150pwm = 0;
 
 float clip_overload(float a){
   if (a > 10000){
@@ -283,12 +290,7 @@ float clip_overload(float a){
   else return a;
 }
 void loop(){
-    // 엔코더 출력 부분
-   
-    
-    
-    // 실행 부분
-    
+
    if (millis() - theta_change_before > Change_vector_interval){
     // 시간에 따라 벡터 방향 변경
       theta_change_before = millis();
@@ -307,15 +309,24 @@ void loop(){
             add_sw = 0;
         }
       }*/
-      /*
+      
       // Draw circle
       theta += theta_interval;
       if(theta >= 2*PI-theta_interval*0.5){
         theta = 0;
       }
-      */
-      theta = PI/2;
       
+      //theta = PI/2;
+      //theta = PI*3/4;
+      /*
+      if (add_sw == 0){
+        theta = PI/2;
+        add_sw = 1;
+      }
+      else{
+        theta = PI*3/2;
+        add_sw = 0;
+      }*/
    }
 
    
@@ -341,18 +352,19 @@ void loop(){
     Serial.println();
 */
     
-    interval = millis() - before;
+    
     
     
     pos1 = Encoder1.read();
     pos2 = Encoder2.read();
     pos3 = Encoder3.read();
     pos4 = Encoder4.read();
-    
-    rpm1 = -(60000/interval) * (pos1/CPR);
-    rpm2 = (60000/interval) * (pos2/CPR);
-    rpm3 = -(60000/interval) * (pos3/CPR);
-    rpm4 = (60000/interval) * (pos4/CPR);
+    delayMicroseconds(1000);
+    interval = millis() - before;
+    rpm1 = -(60000/interval) * (double(pos1)/CPR);
+    rpm2 = (60000/interval) * (double(pos2)/CPR);
+    rpm3 = -(60000/interval) * (double(pos3)/CPR);
+    rpm4 = (60000/interval) * (double(pos4)/CPR);
     
     Encoder1.write(0);
     Encoder2.write(0);
@@ -360,14 +372,65 @@ void loop(){
     Encoder4.write(0);
     
     before = millis();
+    /*Serial.print("pos1 : ");
+    Serial.print(pos1);
+    Serial.print(" RPM2 : ");
+    Serial.print(rpm2);
+    Serial.print("pos2 : ");
+    Serial.print(pos2);
+    Serial.print("RPM3 : ");
+    Serial.print(rpm3);
+    Serial.print("pos3 : ");
+    Serial.print(pos3);
+    Serial.print("RPM4 : ");
+    Serial.print(rpm4);
+    Serial.print("pos4 : ");
+    Serial.println(pos4);
+    */
+    if (abs(rpm1) > 1000 || abs(rpm2) > 1000 || abs(rpm3) > 1000|| abs(rpm4) > 1000){
+      Serial.print("RPM1 : ");
+      Serial.print(rpm1);
+      Serial.print("pos1 : ");
+      Serial.print(pos1);
+      Serial.print(" RPM2 : ");
+      Serial.print(rpm2);
+      Serial.print("pos2 : ");
+      Serial.print(pos2);
+      Serial.print("RPM3 : ");
+      Serial.print(rpm3);
+      Serial.print("pos3 : ");
+      Serial.print(pos3);
+      Serial.print("RPM4 : ");
+      Serial.print(rpm4);
+      Serial.print("pos4 : ");
+      Serial.println(pos4);
+    }
 
     // TODO back 의 경우 고려해줘야함
     // Target RPM = velocity[0] * 238.7
-    // 
     Target_RPM1 = velocity[0] * rpm_per_1m_s; 
     Target_RPM2 = velocity[1] * rpm_per_1m_s;
     Target_RPM3 = velocity[2] * rpm_per_1m_s;
     Target_RPM4 = velocity[3] * rpm_per_1m_s;
+/*
+    if ((Target_RPM1_before == Target_RPM1) * (Target_RPM2_before == Target_RPM2) * (Target_RPM3_before == Target_RPM3) * (Target_RPM4_before == Target_RPM4) == 0){ //target RPM이 바뀐게 있다면
+      now_pwm1 = Target_RPM1 * 65 / 238.7;
+      now_pwm2 = Target_RPM2 * 65 / 238.7;
+      now_pwm3 = Target_RPM3 * 65 / 238.7;
+      now_pwm4 = Target_RPM4 * 65 / 238.7;
+
+      DCMotor_1->setSpeed(now_pwm1);
+      DCMotor_2->setSpeed(now_pwm2);
+      DCMotor_3->setSpeed(now_pwm3);
+      DCMotor_4->setSpeed(now_pwm4);
+
+      startMove(velocity);
+    }
+*/
+    Target_RPM1_before = Target_RPM1;
+    Target_RPM2_before = Target_RPM2;
+    Target_RPM3_before = Target_RPM3;
+    Target_RPM4_before = Target_RPM4;
 
     //P control
     rpm_error1 = Target_RPM1 - rpm1;
@@ -377,13 +440,17 @@ void loop(){
 
 
     //D control
-    dedt1 = (rpm_error1-rpm_error1_before)/(interval*0.001);
+    float d1 = rpm_error1-rpm_error1_before;
+    float d2 = rpm_error2-rpm_error2_before;
+    float d3 = rpm_error3-rpm_error3_before;
+    float d4 = rpm_error4-rpm_error4_before;
+    dedt1 = (d1)/(interval*0.001);
     rpm_error1_before = rpm_error1;
-    dedt2 = (rpm_error2-rpm_error2_before)/(interval*0.001);
+    dedt2 = (d2)/(interval*0.001);
     rpm_error2_before = rpm_error2;
-    dedt3 = (rpm_error3-rpm_error3_before)/(interval*0.001);
+    dedt3 = (d3)/(interval*0.001);
     rpm_error3_before = rpm_error3;
-    dedt4 = (rpm_error4-rpm_error4_before)/(interval*0.001);
+    dedt4 = (d4)/(interval*0.001);
     rpm_error4_before = rpm_error4;
     
     //I control
@@ -391,41 +458,98 @@ void loop(){
     eintegral2 = eintegral2 + rpm_error2*(interval*0.001);
     eintegral3 = eintegral3 + rpm_error3*(interval*0.001);
     eintegral4 = eintegral4 + rpm_error4*(interval*0.001);
-    // control
+    // RPM error PID
     control1 = kp*rpm_error1 + kd*dedt1 + ki*eintegral1;
     control2 = kp*rpm_error2 + kd*dedt2 + ki*eintegral2;
     control3 = kp*rpm_error3 + kd*dedt3 + ki*eintegral3;
     control4 = kp*rpm_error4 + kd*dedt4 + ki*eintegral4;
     //
     float pwm_ratio = 80.; // pwm / velocity(m/s)
-    now_pwm1 += control1 * 50 / Target_RPM1;
-    now_pwm2 += control2 * 50 / Target_RPM2;
-    now_pwm3 += control3 * 50 / Target_RPM3;
-    now_pwm4 += control4 * 50 / Target_RPM4;
-
-    if (now_pwm1 > 255){
-    now_pwm1 = 255;
+    now_pwm1 += control1 * 40 / Target_RPM1;
+    now_pwm2 += control2 * 40 / Target_RPM2;
+    now_pwm3 += control3 * 40 / Target_RPM3;
+    now_pwm4 += control4 * 40 / Target_RPM4;
+/*
+    if (now_pwm1 > 3000){
+      Serial.print("con1 : ");
+      Serial.print(control1);
+      Serial.print(" rpm_error : ");
+      Serial.print(rpm_error1);
+      Serial.print(" dedt : ");
+      Serial.print(dedt1);
+      Serial.print(" dedt_error : ");
+      Serial.print(d1);
+      Serial.print(" eintegral : ");
+      Serial.print(eintegral1);
+      Serial.print(" interval : ");
+      Serial.println(interval);
     }
-    else if (now_pwm1 < 0){
-      now_pwm1 = 0;
+    if (now_pwm1 > 3000){
+      Serial.print("con2 : ");
+      Serial.print(control2);
+      Serial.print(" rpm_error2 : ");
+      Serial.print(rpm_error2);
+      Serial.print(" dedt2 : ");
+      Serial.print(dedt2);
+      Serial.print(" dedt_error : ");
+      Serial.print(d2);
+      Serial.print(" eintegral2 : ");
+      Serial.print(eintegral2);
+      Serial.print(" interval : ");
+      Serial.println(interval);
     }
-    if (now_pwm2 > 255){
-    now_pwm2 = 255;
+    if (now_pwm1 > 3000){
+      Serial.print("con3 : ");
+      Serial.print(control3);
+      Serial.print(" rpm_error3 : ");
+      Serial.print(rpm_error3);
+      Serial.print(" dedt3 : ");
+      Serial.print(dedt3);
+      Serial.print(" dedt_error : ");
+      Serial.print(d3);
+      Serial.print(" eintegral3 : ");
+      Serial.print(eintegral3);
+      Serial.print(" interval : ");
+      Serial.println(interval);
     }
-    else if (now_pwm2 < 0){
-      now_pwm2 = 0;
+    if (now_pwm1 > 3000){
+      Serial.print("con4 : ");
+      Serial.print(control4);
+      Serial.print(" rpm_error4 : ");
+      Serial.print(rpm_error4);
+      Serial.print(" dedt4 : ");
+      Serial.print(dedt4);
+      Serial.print(" dedt_error : ");
+      Serial.print(d4);
+      Serial.print(" eintegral4 : ");
+      Serial.print(eintegral4);
+      Serial.print(" interval : ");
+      Serial.println(interval);
     }
-    if (now_pwm3 > 255){
-    now_pwm3 = 255;
+    */
+    if (now_pwm1 > 250){
+    now_pwm1 = 250;
     }
-    else if (now_pwm3 < 0){
-      now_pwm3 = 0;
+    else if (now_pwm1 < 1){
+      now_pwm1 = 1;
     }
-    if (now_pwm4 > 255){
-    now_pwm4 = 255;
+    if (now_pwm2 > 250){
+    now_pwm2 = 250;
     }
-    else if (now_pwm4 < 0){
-      now_pwm4 = 0;
+    else if (now_pwm2 < 1){
+      now_pwm2 = 1;
+    }
+    if (now_pwm3 > 250){
+    now_pwm3 = 250;
+    }
+    else if (now_pwm3 < 1){
+      now_pwm3 = 1;
+    }
+    if (now_pwm4 > 250){
+    now_pwm4 = 250;
+    }
+    else if (now_pwm4 < 1){
+      now_pwm4 = 1;
     }
 
     
@@ -437,7 +561,7 @@ void loop(){
     startMove(velocity);
     //Serial.print("interval = ");
     //Serial.println(interval);
-
+    
     Serial.print(" now_pwm1 = ");
     Serial.print(now_pwm1);
     Serial.print(" now_pwm2 = ");
@@ -466,6 +590,35 @@ void loop(){
     Serial.print(rpm3);
     Serial.print(" rpm4 = ");
     Serial.println(rpm4);
+    */
+    /*
+    Serial.print("con1 = ");
+    Serial.print(rpm_error1);
+    Serial.print("  ");
+    Serial.print(dedt1);
+    Serial.print("  ");
+    Serial.print(eintegral1);
+    Serial.print("  ");
+    Serial.print(" con2 = ");
+    Serial.print(rpm_error2);
+    Serial.print("  ");
+    Serial.print(dedt2);
+    Serial.print("  ");
+    Serial.print(eintegral2);
+    Serial.print("  ");
+    Serial.print(" con3 = ");
+    Serial.print(rpm_error3);
+    Serial.print("  ");
+    Serial.print(dedt3);
+    Serial.print("  ");
+    Serial.print(eintegral3);
+    Serial.print("  ");
+    Serial.print(" con4 = ");
+    Serial.print(rpm_error4);
+    Serial.print("  ");
+    Serial.print(dedt4);
+    Serial.print("  ");
+    Serial.println(eintegral4);
     */
     
     
